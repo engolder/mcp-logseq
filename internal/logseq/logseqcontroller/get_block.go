@@ -5,16 +5,17 @@ import (
 	"log"
 
 	"github.com/engolder/mcp-logseq/internal/logseq"
+	"github.com/engolder/mcp-logseq/internal/logseq/logseqsvc"
 	"github.com/engolder/mcp-logseq/mcpext"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 type GetBlockTool struct {
-	client *logseq.Client
+	svc logseqsvc.BlockSvc
 }
 
-func NewGetBlockTool(client *logseq.Client) mcpext.ToolRegistrar {
-	return &GetBlockTool{client: client}
+func NewGetBlockTool(svc logseqsvc.BlockSvc) mcpext.ToolRegistrar {
+	return &GetBlockTool{svc: svc}
 }
 
 func (t *GetBlockTool) Register(server *mcp.Server) {
@@ -31,7 +32,7 @@ func (t *GetBlockTool) handle(
 	_ *mcp.ServerSession,
 	params *mcp.CallToolParamsFor[GetBlockInput],
 ) (*mcp.CallToolResultFor[any], error) {
-	block, err := t.client.GetBlock(params.Arguments.UUID)
+	block, err := t.svc.GetBlock(params.Arguments.UUID)
 	if err != nil {
 		return nil, err
 	}
