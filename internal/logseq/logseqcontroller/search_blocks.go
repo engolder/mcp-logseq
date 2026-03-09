@@ -24,7 +24,7 @@ func (t *SearchBlocksTool) Register(server *mcp.Server) {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "search_blocks",
-		Description: "Searches blocks by keyword and/or date range. Use list_namespaces first to determine available namespaces.",
+		Description: "Searches blocks by keyword across all pages. Supports pagination via limit and offset.",
 	}, t.handle)
 }
 
@@ -39,7 +39,7 @@ func (t *SearchBlocksTool) handle(
 		limit = 50
 	}
 
-	result, err := t.svc.SearchBlocks(input.Query, input.Namespace, input.StartDate, input.EndDate, limit, input.Offset)
+	result, err := t.svc.SearchBlocks(input.Query, limit, input.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -63,10 +63,7 @@ func (t *SearchBlocksTool) handle(
 }
 
 type SearchBlocksInput struct {
-	Query     string `json:"query"`
-	Namespace string `json:"namespace,omitempty"`
-	StartDate string `json:"start_date,omitempty"`
-	EndDate   string `json:"end_date,omitempty"`
-	Limit     int    `json:"limit,omitempty"`
-	Offset    int    `json:"offset,omitempty"`
+	Query  string `json:"query"`
+	Limit  int    `json:"limit,omitempty"`
+	Offset int    `json:"offset,omitempty"`
 }

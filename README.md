@@ -5,8 +5,9 @@ Logseq MCP server. Exposes Logseq graph data and editing capabilities as MCP too
 ## Tools
 
 - `get_block` — fetches a block and its full child tree by UUID
-- `list_namespaces` — lists available namespaces in the graph (e.g. `journal`, `project`); use before `search_blocks` to determine search scope
-- `search_blocks` — searches blocks by keyword and/or date range within a namespace; supports pagination via `limit` and `offset`
+- `list_pages` — lists non-journal pages; `parent` controls scope: omit for all, `null` for root-only, or a namespace name for its direct children; each entry includes `has_children`; supports pagination via `limit` and `offset`
+- `list_journal_pages` — lists journal (daily note) pages, newest first; optionally filter by `start_date`/`end_date` in `YYYYMMDD` format; supports pagination via `limit` and `offset`
+- `search_blocks` — searches blocks by keyword across all pages; supports pagination via `limit` and `offset`
 - `get_page` — fetches all blocks of a page by name
 - `create_page` — creates a new page with given content
 - `insert_block` — inserts a new block relative to a target block (`before`, `after`, or `child`)

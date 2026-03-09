@@ -22,11 +22,6 @@ var Module = fx.Module(
 	)),
 
 	fx.Provide(fx.Annotate(
-		logseqcontroller.NewListNamespacesTool,
-		fx.ResultTags(`group:"mcp.tools"`),
-	)),
-
-	fx.Provide(fx.Annotate(
 		logseqcontroller.NewSearchBlocksTool,
 		fx.ResultTags(`group:"mcp.tools"`),
 	)),
@@ -38,6 +33,16 @@ var Module = fx.Module(
 
 	fx.Provide(fx.Annotate(
 		logseqcontroller.NewCreatePageTool,
+		fx.ResultTags(`group:"mcp.tools"`),
+	)),
+
+	fx.Provide(fx.Annotate(
+		logseqcontroller.NewListPagesTool,
+		fx.ResultTags(`group:"mcp.tools"`),
+	)),
+
+	fx.Provide(fx.Annotate(
+		logseqcontroller.NewListJournalPagesTool,
 		fx.ResultTags(`group:"mcp.tools"`),
 	)),
 
