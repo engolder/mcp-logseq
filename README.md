@@ -7,6 +7,7 @@ Logseq MCP server. Exposes Logseq graph data and editing capabilities as MCP too
 - `read_page` — returns the full outline text of a page (2-space indent, `- ` prefix)
 - `write_page` — overwrites a page with outline text, or creates it if new
 - `edit_page` — finds a block by content and replaces its subtree; `old_content` must uniquely match one block
+- `search_pages` — searches non-journal pages by name; omit query to list all pages; supports pagination via `limit` and `offset`
 - `list_journal_pages` — lists journal (daily note) pages, newest first; optionally filter by `start_date`/`end_date` in `YYYYMMDD` format; supports pagination via `limit` and `offset`
 - `search` — searches blocks by keyword across all pages; returns page name and content (no UUIDs); supports pagination via `limit` and `offset`
 

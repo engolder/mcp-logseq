@@ -25,7 +25,7 @@ func (t *SearchTool) Register(server *mcp.Server) {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "search",
-		Description: "Searches blocks by keyword across all pages. Returns page name and block content. Supports pagination via limit and offset.",
+		Description: "Searches block contents by keyword (substring match) across all pages including journals. Returns page name and block content. Supports pagination via limit and offset.",
 	}, t.handle)
 }
 

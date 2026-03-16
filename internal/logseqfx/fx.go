@@ -32,6 +32,11 @@ var Module = fx.Module(
 	)),
 
 	fx.Provide(fx.Annotate(
+		logseqcontroller.NewSearchPagesTool,
+		fx.ResultTags(`group:"mcp.tools"`),
+	)),
+
+	fx.Provide(fx.Annotate(
 		logseqcontroller.NewSearchTool,
 		fx.ResultTags(`group:"mcp.tools"`),
 	)),

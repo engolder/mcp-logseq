@@ -13,6 +13,7 @@ type PageSvc interface {
 	ReadPage(name string) (string, bool, error)
 	WritePage(name string, nodes []*logseq.OutlineNode) error
 	EditPage(name string, oldContent string, newNodes []*logseq.OutlineNode) error
+	SearchPages(query string, limit, offset int) (*logseq.PageResult, error)
 	ListJournalPages(startDate, endDate string, limit, offset int) (*logseq.JournalPageResult, error)
 }
 
@@ -189,6 +190,44 @@ func (s *pageSvc) EditPage(name string, oldContent string, newNodes []*logseq.Ou
 		prevUUID = uuid
 	}
 	return nil
+}
+
+func (s *pageSvc) SearchPages(query string, limit, offset int) (*logseq.PageResult, error) {
+	conditions := []string{
+		"[?p :block/original-name ?name]",
+		"(not [?p :block/journal? true])",
+	}
+	if query != "" {
+		conditions = append(conditions, fmt.Sprintf("[(clojure.string/includes? ?name %q)]", query))
+	}
+	dq := "[:find ?name :where " + strings.Join(conditions, " ") + "]"
+
+	raw, err := s.client.DoAPI("logseq.DB.datascriptQuery", []any{dq})
+	if err != nil {
+		return nil, err
+	}
+	var rows [][]string
+	if err := json.Unmarshal(raw, &rows); err != nil {
+		return nil, err
+	}
+
+	names := make([]string, 0, len(rows))
+	for _, row := range rows {
+		if len(row) > 0 {
+			names = append(names, row[0])
+		}
+	}
+	sort.Strings(names)
+
+	total := len(names)
+	if offset >= total {
+		return &logseq.PageResult{Total: total, Pages: []string{}}, nil
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	return &logseq.PageResult{Total: total, Pages: names[offset:end]}, nil
 }
 
 func (s *pageSvc) ListJournalPages(startDate, endDate string, limit, offset int) (*logseq.JournalPageResult, error) {
