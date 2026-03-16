@@ -14,26 +14,15 @@ func main() {
 	blockSvc := logseqsvc.NewBlockSvc(client)
 	pageSvc := logseqsvc.NewPageSvc(client, blockSvc)
 
-	// list_pages (all, first 5)
-	fmt.Println("\n=== list_pages (all, first 5) ===")
-	pageResult, err := pageSvc.ListPages(5, 0)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Printf("Total: %d\n", pageResult.Total)
-	for _, name := range pageResult.Pages {
-		fmt.Println(name)
-	}
-
-	// search_blocks
-	fmt.Println("\n=== search_blocks: ipc in journal ===")
+	// search
+	fmt.Println("=== search: ipc ===")
 	result, err := searchSvc.SearchBlocks("ipc", 3, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("Total: %d\n", result.Total)
 	for _, b := range result.Blocks {
-		fmt.Printf("[%s] (journal: %d)\nuuid: %s\ncontent: %s\n\n", b.PageName, b.JournalDay, b.UUID, b.Content)
+		fmt.Printf("[%s] (journal: %d)\ncontent: %s\n\n", b.PageName, b.JournalDay, b.Content)
 	}
 
 	// get_block

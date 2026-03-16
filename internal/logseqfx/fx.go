@@ -37,11 +37,6 @@ var Module = fx.Module(
 	)),
 
 	fx.Provide(fx.Annotate(
-		logseqcontroller.NewListPagesTool,
-		fx.ResultTags(`group:"mcp.tools"`),
-	)),
-
-	fx.Provide(fx.Annotate(
 		logseqcontroller.NewListJournalPagesTool,
 		fx.ResultTags(`group:"mcp.tools"`),
 	)),
