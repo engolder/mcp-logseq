@@ -17,22 +17,22 @@ var Module = fx.Module(
 	fx.Provide(logseqsvc.NewSearchSvc),
 
 	fx.Provide(fx.Annotate(
-		logseqcontroller.NewGetBlockTool,
+		logseqcontroller.NewReadPageTool,
 		fx.ResultTags(`group:"mcp.tools"`),
 	)),
 
 	fx.Provide(fx.Annotate(
-		logseqcontroller.NewSearchBlocksTool,
+		logseqcontroller.NewWritePageTool,
 		fx.ResultTags(`group:"mcp.tools"`),
 	)),
 
 	fx.Provide(fx.Annotate(
-		logseqcontroller.NewGetPageTool,
+		logseqcontroller.NewEditPageTool,
 		fx.ResultTags(`group:"mcp.tools"`),
 	)),
 
 	fx.Provide(fx.Annotate(
-		logseqcontroller.NewCreatePageTool,
+		logseqcontroller.NewSearchTool,
 		fx.ResultTags(`group:"mcp.tools"`),
 	)),
 
@@ -43,16 +43,6 @@ var Module = fx.Module(
 
 	fx.Provide(fx.Annotate(
 		logseqcontroller.NewListJournalPagesTool,
-		fx.ResultTags(`group:"mcp.tools"`),
-	)),
-
-	fx.Provide(fx.Annotate(
-		logseqcontroller.NewInsertBlockTool,
-		fx.ResultTags(`group:"mcp.tools"`),
-	)),
-
-	fx.Provide(fx.Annotate(
-		logseqcontroller.NewUpdateBlockTool,
 		fx.ResultTags(`group:"mcp.tools"`),
 	)),
 )

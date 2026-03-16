@@ -4,14 +4,22 @@ Logseq MCP server. Exposes Logseq graph data and editing capabilities as MCP too
 
 ## Tools
 
-- `get_block` — fetches a block and its full child tree by UUID
-- `list_pages` — lists non-journal pages; `parent` controls scope: omit for all, `null` for root-only, or a namespace name for its direct children; each entry includes `has_children`; supports pagination via `limit` and `offset`
+- `read_page` — returns the full outline text of a page (2-space indent, `- ` prefix)
+- `write_page` — overwrites a page with outline text, or creates it if new
+- `edit_page` — finds a block by content and replaces its subtree; `old_content` must uniquely match one block
+- `list_pages` — lists all non-journal pages with full names (e.g. `project/sub`); supports pagination via `limit` and `offset`
 - `list_journal_pages` — lists journal (daily note) pages, newest first; optionally filter by `start_date`/`end_date` in `YYYYMMDD` format; supports pagination via `limit` and `offset`
-- `search_blocks` — searches blocks by keyword across all pages; supports pagination via `limit` and `offset`
-- `get_page` — fetches all blocks of a page by name
-- `create_page` — creates a new page with given content
-- `insert_block` — inserts a new block relative to a target block (`before`, `after`, or `child`)
-- `update_block` — replaces the content of a block by UUID
+- `search` — searches blocks by keyword across all pages; returns page name and content (no UUIDs); supports pagination via `limit` and `offset`
+
+### Outline text format
+
+```
+- Block 1
+  - Child 1
+    - Grandchild
+  - Child 2
+- Block 2
+```
 
 ## Setup
 

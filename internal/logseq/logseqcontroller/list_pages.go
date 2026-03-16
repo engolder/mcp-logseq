@@ -2,12 +2,10 @@ package logseqcontroller
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
 
-	"github.com/engolder/mcp-logseq/internal/logseq"
 	"github.com/engolder/mcp-logseq/internal/logseq/logseqsvc"
 	"github.com/engolder/mcp-logseq/mcpext"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -26,7 +24,7 @@ func (t *ListPagesTool) Register(server *mcp.Server) {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "list_pages",
-		Description: `Lists non-journal pages. "parent" controls scope: omit for all pages, null for root-only pages (no namespace), or a namespace name (e.g. "project") for its direct children. Each entry includes has_children to indicate whether further navigation is possible.`,
+		Description: "Lists all non-journal pages. Namespace pages appear with their full name (e.g. \"project/sub\"). Supports pagination via limit and offset.",
 	}, t.handle)
 }
 
@@ -42,20 +40,15 @@ func (t *ListPagesTool) handle(
 		limit = 50
 	}
 
-	parent, err := input.parseParent()
-	if err != nil {
-		return nil, err
-	}
-
-	result, err := t.svc.ListPages(parent, limit, input.Offset)
+	result, err := t.svc.ListPages(limit, input.Offset)
 	if err != nil {
 		return nil, err
 	}
 
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "Total: %d\n\n", result.Total)
-	for _, entry := range result.Pages {
-		sb.WriteString(formatPageEntry(entry))
+	for _, name := range result.Pages {
+		sb.WriteString(name)
 		sb.WriteByte('\n')
 	}
 
@@ -64,32 +57,7 @@ func (t *ListPagesTool) handle(
 	}, nil
 }
 
-func formatPageEntry(e logseq.PageEntry) string {
-	if e.HasChildren {
-		return e.Name + "/"
-	}
-	return e.Name
-}
-
 type ListPagesInput struct {
-	// Parent: omit = all pages, null = root pages, "name" = children of that namespace.
-	RawParent json.RawMessage `json:"parent,omitempty"`
-	Limit     int             `json:"limit,omitempty"`
-	Offset    int             `json:"offset,omitempty"`
-}
-
-// parseParent returns nil (all pages), &"" (root pages), or &"name" (namespace children).
-func (i *ListPagesInput) parseParent() (*string, error) {
-	if len(i.RawParent) == 0 {
-		return nil, nil // omitted = all pages
-	}
-	if string(i.RawParent) == "null" {
-		empty := ""
-		return &empty, nil // JSON null = root pages only
-	}
-	var s string
-	if err := json.Unmarshal(i.RawParent, &s); err != nil {
-		return nil, err
-	}
-	return &s, nil
+	Limit  int `json:"limit,omitempty"`
+	Offset int `json:"offset,omitempty"`
 }

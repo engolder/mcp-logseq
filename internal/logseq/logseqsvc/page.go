@@ -10,23 +10,23 @@ import (
 )
 
 type PageSvc interface {
-	GetPageBlocks(name string) ([]logseq.Block, bool, error)
-	CreatePage(name, content string) (string, error)
-	// ListPages lists non-journal pages.
-	// parent==nil: all pages, parent==&"": root pages only, parent==&"project": direct children of "project".
-	ListPages(parent *string, limit, offset int) (*logseq.PageResult, error)
+	ReadPage(name string) (string, bool, error)
+	WritePage(name string, nodes []*logseq.OutlineNode) error
+	EditPage(name string, oldContent string, newNodes []*logseq.OutlineNode) error
+	ListPages(limit, offset int) (*logseq.PageResult, error)
 	ListJournalPages(startDate, endDate string, limit, offset int) (*logseq.JournalPageResult, error)
 }
 
 type pageSvc struct {
-	client *logseq.Client
+	client   *logseq.Client
+	blockSvc BlockSvc
 }
 
-func NewPageSvc(client *logseq.Client) PageSvc {
-	return &pageSvc{client: client}
+func NewPageSvc(client *logseq.Client, blockSvc BlockSvc) PageSvc {
+	return &pageSvc{client: client, blockSvc: blockSvc}
 }
 
-func (s *pageSvc) GetPageBlocks(name string) ([]logseq.Block, bool, error) {
+func (s *pageSvc) getPageBlocks(name string) ([]logseq.Block, bool, error) {
 	result, err := s.client.DoAPI("logseq.Editor.getPage", []any{name})
 	if err != nil {
 		return nil, false, err
@@ -46,50 +46,9 @@ func (s *pageSvc) GetPageBlocks(name string) ([]logseq.Block, bool, error) {
 	return blocks, true, nil
 }
 
-func (s *pageSvc) CreatePage(name, content string) (string, error) {
-	result, err := s.client.DoAPI("logseq.Editor.createPage", []any{name, map[string]any{}, map[string]any{"createFirstBlock": true, "redirect": false}})
-	if err != nil {
-		return "", err
-	}
-	var page struct {
-		UUID string `json:"uuid"`
-	}
-	if err := json.Unmarshal(result, &page); err != nil {
-		return "", err
-	}
 
-	result, err = s.client.DoAPI("logseq.Editor.getPageBlocksTree", []any{name})
-	if err != nil {
-		return "", err
-	}
-	var blocks []logseq.Block
-	if err := json.Unmarshal(result, &blocks); err != nil {
-		return "", err
-	}
-
-	if len(blocks) == 0 {
-		return page.UUID, nil
-	}
-
-	if _, err := s.client.DoAPI("logseq.Editor.updateBlock", []any{blocks[0].UUID, content}); err != nil {
-		return "", err
-	}
-	return page.UUID, nil
-}
-
-func (s *pageSvc) ListPages(parent *string, limit, offset int) (*logseq.PageResult, error) {
-	var query string
-	switch {
-	case parent == nil:
-		query = `[:find ?name :where [?p :block/original-name ?name] (not [?p :block/journal? true])]`
-	case *parent == "":
-		query = `[:find ?name :where [?p :block/original-name ?name] (not [?p :block/namespace _]) (not [?p :block/journal? true])]`
-	default:
-		query = fmt.Sprintf(
-			`[:find ?name :where [?p :block/original-name ?name] [?p :block/namespace ?par] [?par :block/name %q]]`,
-			strings.ToLower(*parent),
-		)
-	}
+func (s *pageSvc) ListPages(limit, offset int) (*logseq.PageResult, error) {
+	query := `[:find ?name :where [?p :block/original-name ?name] (not [?p :block/journal? true])]`
 
 	raw, err := s.client.DoAPI("logseq.DB.datascriptQuery", []any{query})
 	if err != nil {
@@ -110,48 +69,157 @@ func (s *pageSvc) ListPages(parent *string, limit, offset int) (*logseq.PageResu
 
 	total := len(names)
 	if offset >= total {
-		return &logseq.PageResult{Total: total, Pages: []logseq.PageEntry{}}, nil
+		return &logseq.PageResult{Total: total, Pages: []string{}}, nil
 	}
 	end := offset + limit
 	if end > total {
 		end = total
 	}
-	names = names[offset:end]
-
-	namespaceSet, err := s.fetchNamespaceSet()
-	if err != nil {
-		return nil, err
-	}
-
-	entries := make([]logseq.PageEntry, len(names))
-	for i, name := range names {
-		entries[i] = logseq.PageEntry{
-			Name:        name,
-			HasChildren: namespaceSet[name],
-		}
-	}
-	return &logseq.PageResult{Total: total, Pages: entries}, nil
+	return &logseq.PageResult{Total: total, Pages: names[offset:end]}, nil
 }
 
-// fetchNamespaceSet returns a set of page original-names that have at least one child page.
-func (s *pageSvc) fetchNamespaceSet() (map[string]bool, error) {
-	raw, err := s.client.DoAPI("logseq.DB.datascriptQuery", []any{
-		`[:find ?name :where [_ :block/namespace ?p] [?p :block/original-name ?name]]`,
-	})
+func (s *pageSvc) ReadPage(name string) (string, bool, error) {
+	blocks, exists, err := s.getPageBlocks(name)
 	if err != nil {
-		return nil, err
+		return "", false, err
 	}
-	var rows [][]string
-	if err := json.Unmarshal(raw, &rows); err != nil {
-		return nil, err
+	if !exists {
+		return "", false, nil
 	}
-	set := make(map[string]bool, len(rows))
-	for _, row := range rows {
-		if len(row) > 0 {
-			set[row[0]] = true
+	var sb strings.Builder
+	for _, block := range blocks {
+		sb.WriteString(logseq.RenderTree(&block, 0))
+	}
+	return sb.String(), true, nil
+}
+
+func (s *pageSvc) WritePage(name string, nodes []*logseq.OutlineNode) error {
+	// Delete existing page if present
+	result, err := s.client.DoAPI("logseq.Editor.getPage", []any{name})
+	if err != nil {
+		return err
+	}
+	if string(result) != "null" {
+		if _, err := s.client.DoAPI("logseq.Editor.deletePage", []any{name}); err != nil {
+			return err
 		}
 	}
-	return set, nil
+
+	if len(nodes) == 0 {
+		_, err := s.client.DoAPI("logseq.Editor.createPage", []any{name, map[string]any{}, map[string]any{"createFirstBlock": false, "redirect": false}})
+		return err
+	}
+
+	if _, err := s.client.DoAPI("logseq.Editor.createPage", []any{name, map[string]any{}, map[string]any{"createFirstBlock": true, "redirect": false}}); err != nil {
+		return err
+	}
+
+	raw, err := s.client.DoAPI("logseq.Editor.getPageBlocksTree", []any{name})
+	if err != nil {
+		return err
+	}
+	var blocks []logseq.Block
+	if err := json.Unmarshal(raw, &blocks); err != nil {
+		return err
+	}
+	if len(blocks) == 0 {
+		return fmt.Errorf("page has no blocks after creation")
+	}
+
+	firstUUID := blocks[0].UUID
+	if err := s.blockSvc.UpdateBlock(firstUUID, nodes[0].Content); err != nil {
+		return err
+	}
+	if len(nodes[0].Children) > 0 {
+		if err := s.blockSvc.InsertTree(firstUUID, nodes[0].Children); err != nil {
+			return err
+		}
+	}
+
+	prevUUID := firstUUID
+	for _, node := range nodes[1:] {
+		uuid, err := s.blockSvc.InsertBlock(prevUUID, node.Content, "after")
+		if err != nil {
+			return err
+		}
+		if len(node.Children) > 0 {
+			if err := s.blockSvc.InsertTree(uuid, node.Children); err != nil {
+				return err
+			}
+		}
+		prevUUID = uuid
+	}
+	return nil
+}
+
+func (s *pageSvc) EditPage(name string, oldContent string, newNodes []*logseq.OutlineNode) error {
+	blocks, exists, err := s.getPageBlocks(name)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return fmt.Errorf("page not found: %s", name)
+	}
+
+	var matches []logseq.Block
+	var dfs func(bs []logseq.Block)
+	dfs = func(bs []logseq.Block) {
+		for _, b := range bs {
+			if logseq.CleanContent(b.Content) == oldContent {
+				matches = append(matches, b)
+			}
+			dfs(b.Children)
+		}
+	}
+	dfs(blocks)
+
+	if len(matches) == 0 {
+		return fmt.Errorf("block not found: %q", oldContent)
+	}
+	if len(matches) > 1 {
+		return fmt.Errorf("ambiguous match: %d blocks match %q", len(matches), oldContent)
+	}
+
+	matched := matches[0]
+
+	newRootContent := ""
+	if len(newNodes) > 0 {
+		newRootContent = newNodes[0].Content
+	}
+	if err := s.blockSvc.UpdateBlock(matched.UUID, newRootContent); err != nil {
+		return err
+	}
+
+	for _, child := range matched.Children {
+		if _, err := s.client.DoAPI("logseq.Editor.removeBlock", []any{child.UUID}); err != nil {
+			return err
+		}
+	}
+
+	var newChildren []*logseq.OutlineNode
+	if len(newNodes) > 0 {
+		newChildren = newNodes[0].Children
+	}
+	if len(newChildren) > 0 {
+		if err := s.blockSvc.InsertTree(matched.UUID, newChildren); err != nil {
+			return err
+		}
+	}
+
+	prevUUID := matched.UUID
+	for _, node := range newNodes[1:] {
+		uuid, err := s.blockSvc.InsertBlock(prevUUID, node.Content, "after")
+		if err != nil {
+			return err
+		}
+		if len(node.Children) > 0 {
+			if err := s.blockSvc.InsertTree(uuid, node.Children); err != nil {
+				return err
+			}
+		}
+		prevUUID = uuid
+	}
+	return nil
 }
 
 func (s *pageSvc) ListJournalPages(startDate, endDate string, limit, offset int) (*logseq.JournalPageResult, error) {

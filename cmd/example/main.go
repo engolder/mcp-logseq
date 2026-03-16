@@ -12,22 +12,22 @@ func main() {
 	client := logseq.NewClient()
 	searchSvc := logseqsvc.NewSearchSvc(client)
 	blockSvc := logseqsvc.NewBlockSvc(client)
-	pageSvc := logseqsvc.NewPageSvc(client)
+	pageSvc := logseqsvc.NewPageSvc(client, blockSvc)
 
 	// list_pages (all, first 5)
 	fmt.Println("\n=== list_pages (all, first 5) ===")
-	pageResult, err := pageSvc.ListPages(nil, 5, 0)
+	pageResult, err := pageSvc.ListPages(5, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("Total: %d\n", pageResult.Total)
-	for _, p := range pageResult.Pages {
-		fmt.Printf("%s (has_children: %v)\n", p.Name, p.HasChildren)
+	for _, name := range pageResult.Pages {
+		fmt.Println(name)
 	}
 
 	// search_blocks
-	fmt.Println("\n=== search_blocks: toss-pos-bridge in journal ===")
-	result, err := searchSvc.SearchBlocks("toss-pos-bridge", 3, 0)
+	fmt.Println("\n=== search_blocks: ipc in journal ===")
+	result, err := searchSvc.SearchBlocks("ipc", 3, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -46,11 +46,11 @@ func main() {
 		fmt.Println(logseq.RenderTree(block, 0))
 	}
 
-	// get_page
-	fmt.Println("=== get_page: knowledge-note-design ===")
-	blocks, exists, err := pageSvc.GetPageBlocks("knowledge-note-design")
+	// read_page
+	fmt.Println("=== read_page: knowledge-note-design ===")
+	text, exists, err := pageSvc.ReadPage("knowledge-note-design")
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("exists: %v, blocks: %d\n", exists, len(blocks))
+	fmt.Printf("exists: %v\n%s", exists, text)
 }

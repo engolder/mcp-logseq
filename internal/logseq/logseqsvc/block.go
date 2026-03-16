@@ -10,6 +10,7 @@ type BlockSvc interface {
 	GetBlock(uuid string) (*logseq.Block, error)
 	InsertBlock(targetUUID, content, position string) (string, error)
 	UpdateBlock(uuid, content string) error
+	InsertTree(parentUUID string, nodes []*logseq.OutlineNode) error
 }
 
 type blockSvc struct {
@@ -56,4 +57,27 @@ func (s *blockSvc) InsertBlock(targetUUID, content, position string) (string, er
 func (s *blockSvc) UpdateBlock(uuid, content string) error {
 	_, err := s.client.DoAPI("logseq.Editor.updateBlock", []any{uuid, content})
 	return err
+}
+
+// InsertTree inserts a tree of OutlineNodes under parentUUID.
+// The first node is inserted as a child; subsequent siblings use "after" position.
+func (s *blockSvc) InsertTree(parentUUID string, nodes []*logseq.OutlineNode) error {
+	prevUUID := parentUUID
+	for i, node := range nodes {
+		pos := "after"
+		if i == 0 {
+			pos = "child"
+		}
+		uuid, err := s.InsertBlock(prevUUID, node.Content, pos)
+		if err != nil {
+			return err
+		}
+		if len(node.Children) > 0 {
+			if err := s.InsertTree(uuid, node.Children); err != nil {
+				return err
+			}
+		}
+		prevUUID = uuid
+	}
+	return nil
 }

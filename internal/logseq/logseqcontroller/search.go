@@ -6,32 +6,33 @@ import (
 	"log"
 	"strings"
 
+	"github.com/engolder/mcp-logseq/internal/logseq"
 	"github.com/engolder/mcp-logseq/internal/logseq/logseqsvc"
 	"github.com/engolder/mcp-logseq/mcpext"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-type SearchBlocksTool struct {
+type SearchTool struct {
 	svc logseqsvc.SearchSvc
 }
 
-func NewSearchBlocksTool(svc logseqsvc.SearchSvc) mcpext.ToolRegistrar {
-	return &SearchBlocksTool{svc: svc}
+func NewSearchTool(svc logseqsvc.SearchSvc) mcpext.ToolRegistrar {
+	return &SearchTool{svc: svc}
 }
 
-func (t *SearchBlocksTool) Register(server *mcp.Server) {
-	log.Println("Registering MCP tool: search_blocks")
+func (t *SearchTool) Register(server *mcp.Server) {
+	log.Println("Registering MCP tool: search")
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "search_blocks",
-		Description: "Searches blocks by keyword across all pages. Supports pagination via limit and offset.",
+		Name:        "search",
+		Description: "Searches blocks by keyword across all pages. Returns page name and block content. Supports pagination via limit and offset.",
 	}, t.handle)
 }
 
-func (t *SearchBlocksTool) handle(
+func (t *SearchTool) handle(
 	ctx context.Context,
 	_ *mcp.ServerSession,
-	params *mcp.CallToolParamsFor[SearchBlocksInput],
+	params *mcp.CallToolParamsFor[SearchInput],
 ) (*mcp.CallToolResultFor[any], error) {
 	input := params.Arguments
 	limit := input.Limit
@@ -53,8 +54,7 @@ func (t *SearchBlocksTool) handle(
 		} else {
 			fmt.Fprintf(&sb, "[%s]\n", block.PageName)
 		}
-		fmt.Fprintf(&sb, "uuid: %s\n", block.UUID)
-		fmt.Fprintf(&sb, "content: %s\n", block.Content)
+		fmt.Fprintf(&sb, "content: %s\n", logseq.CleanContent(block.Content))
 	}
 
 	return &mcp.CallToolResultFor[any]{
@@ -62,7 +62,7 @@ func (t *SearchBlocksTool) handle(
 	}, nil
 }
 
-type SearchBlocksInput struct {
+type SearchInput struct {
 	Query  string `json:"query"`
 	Limit  int    `json:"limit,omitempty"`
 	Offset int    `json:"offset,omitempty"`
