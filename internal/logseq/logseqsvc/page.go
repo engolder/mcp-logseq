@@ -209,6 +209,8 @@ func (s *pageSvc) SearchPages(query string, limit, offset int) (*logseq.PageResu
 	conditions := []string{
 		"[?p :block/original-name ?name]",
 		"(not [?p :block/journal? true])",
+		// only pages backed by an actual file (matches Logseq's All Pages view)
+		"[?p :block/file _]",
 	}
 	if query != "" {
 		conditions = append(conditions, fmt.Sprintf("[(clojure.string/includes? ?name %q)]", query))
@@ -224,10 +226,16 @@ func (s *pageSvc) SearchPages(query string, limit, offset int) (*logseq.PageResu
 		return nil, err
 	}
 
+	// trim + lowercase-based dedup (matches :block/name normalization in Logseq)
+	seen := make(map[string]bool)
 	names := make([]string, 0, len(rows))
 	for _, row := range rows {
 		if len(row) > 0 {
-			names = append(names, row[0])
+			name := strings.TrimSpace(row[0])
+			if name != "" && !seen[strings.ToLower(name)] {
+				seen[strings.ToLower(name)] = true
+				names = append(names, name)
+			}
 		}
 	}
 	sort.Strings(names)
@@ -255,9 +263,9 @@ func (s *pageSvc) ListJournalPages(startDate, endDate string, limit, offset int)
 	if endDate != "" {
 		conditions = append(conditions, fmt.Sprintf("[(< ?jday %s)]", endDate))
 	}
-	query := "[:find ?name ?jday :where " + strings.Join(conditions, " ") + "]"
+	dq := "[:find ?name ?jday :where " + strings.Join(conditions, " ") + "]"
 
-	raw, err := s.client.DoAPI("logseq.DB.datascriptQuery", []any{query})
+	raw, err := s.client.DoAPI("logseq.DB.datascriptQuery", []any{dq})
 	if err != nil {
 		return nil, err
 	}

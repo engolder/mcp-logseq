@@ -24,7 +24,7 @@ func (t *SearchPagesTool) Register(server *mcp.Server) {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "search_pages",
-		Description: "Searches non-journal pages by name (substring match). Omit or leave query empty to list all pages. Supports pagination via limit and offset.",
+		Description: "Searches non-journal pages by name (substring match). Returns only pages backed by an actual file (excludes auto-created tag/reference pages). Omit or leave query empty to list all pages. Supports pagination via limit and offset.",
 	}, t.handle)
 }
 
