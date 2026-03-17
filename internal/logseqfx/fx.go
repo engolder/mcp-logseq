@@ -17,6 +17,11 @@ var Module = fx.Module(
 	fx.Provide(logseqsvc.NewSearchSvc),
 
 	fx.Provide(fx.Annotate(
+		logseqcontroller.NewDeletePageTool,
+		fx.ResultTags(`group:"mcp.tools"`),
+	)),
+
+	fx.Provide(fx.Annotate(
 		logseqcontroller.NewReadPageTool,
 		fx.ResultTags(`group:"mcp.tools"`),
 	)),

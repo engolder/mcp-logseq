@@ -4,6 +4,7 @@ Logseq MCP server. Exposes Logseq graph data and editing capabilities as MCP too
 
 ## Tools
 
+- `delete_page` — deletes a page by name; returns an error if not found
 - `read_page` — returns the full outline text of a page (2-space indent, `- ` prefix)
 - `write_page` — overwrites a page with outline text, or creates it if new
 - `edit_page` — finds a block by content and replaces its subtree; `old_content` must uniquely match one block

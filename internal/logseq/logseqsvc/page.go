@@ -13,6 +13,7 @@ type PageSvc interface {
 	ReadPage(name string) (string, bool, error)
 	WritePage(name string, nodes []*logseq.OutlineNode) error
 	EditPage(name string, oldContent string, newNodes []*logseq.OutlineNode) error
+	DeletePage(name string) error
 	SearchPages(query string, limit, offset int) (*logseq.PageResult, error)
 	ListJournalPages(startDate, endDate string, limit, offset int) (*logseq.JournalPageResult, error)
 }
@@ -190,6 +191,18 @@ func (s *pageSvc) EditPage(name string, oldContent string, newNodes []*logseq.Ou
 		prevUUID = uuid
 	}
 	return nil
+}
+
+func (s *pageSvc) DeletePage(name string) error {
+	result, err := s.client.DoAPI("logseq.Editor.getPage", []any{name})
+	if err != nil {
+		return err
+	}
+	if string(result) == "null" {
+		return fmt.Errorf("page not found: %s", name)
+	}
+	_, err = s.client.DoAPI("logseq.Editor.deletePage", []any{name})
+	return err
 }
 
 func (s *pageSvc) SearchPages(query string, limit, offset int) (*logseq.PageResult, error) {
