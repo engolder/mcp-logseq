@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 
-	"github.com/engolder/mcp-logseq/internal/logseq"
 	"github.com/engolder/mcp-logseq/internal/logseq/logseqsvc"
 	"github.com/engolder/mcp-logseq/mcpext"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -23,7 +22,7 @@ func (t *EditPageTool) Register(server *mcp.Server) {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "edit_page",
-		Description: "Replaces a block subtree in a Logseq page. old_content is the plain block text to find (must be unique). new_content is the outline text replacement.",
+		Description: "Find and replace text in a Logseq page. old_content must be an exact substring of the page outline (as returned by read_page or get_block). new_content is the replacement in the same outline format. Both can span multiple blocks. Indentation must match exactly.",
 	}, t.handle)
 }
 
@@ -32,11 +31,7 @@ func (t *EditPageTool) handle(
 	_ *mcp.ServerSession,
 	params *mcp.CallToolParamsFor[EditPageInput],
 ) (*mcp.CallToolResultFor[any], error) {
-	newNodes, err := logseq.ParseOutline(params.Arguments.NewContent)
-	if err != nil {
-		return nil, err
-	}
-	if err := t.svc.EditPage(params.Arguments.Name, params.Arguments.OldContent, newNodes); err != nil {
+	if err := t.svc.EditPage(params.Arguments.Name, params.Arguments.OldContent, params.Arguments.NewContent); err != nil {
 		return nil, err
 	}
 	return &mcp.CallToolResultFor[any]{

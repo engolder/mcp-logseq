@@ -12,7 +12,7 @@ import (
 type PageSvc interface {
 	ReadPage(name string) (string, bool, error)
 	WritePage(name string, nodes []*logseq.OutlineNode) error
-	EditPage(name string, oldContent string, newNodes []*logseq.OutlineNode) error
+	EditPage(name string, oldContent string, newContent string) error
 	DeletePage(name string) error
 	SearchPages(query string, limit, offset int) (*logseq.PageResult, error)
 	ListJournalPages(startDate, endDate string, limit, offset int) (*logseq.JournalPageResult, error)
@@ -57,11 +57,8 @@ func (s *pageSvc) ReadPage(name string) (string, bool, error) {
 	if !exists {
 		return "", false, nil
 	}
-	var sb strings.Builder
-	for _, block := range blocks {
-		sb.WriteString(logseq.RenderTree(&block, 0))
-	}
-	return sb.String(), true, nil
+	rendered, _ := logseq.RenderTreeAnnotated(blocks)
+	return rendered, true, nil
 }
 
 func (s *pageSvc) WritePage(name string, nodes []*logseq.OutlineNode) error {
@@ -123,7 +120,7 @@ func (s *pageSvc) WritePage(name string, nodes []*logseq.OutlineNode) error {
 	return nil
 }
 
-func (s *pageSvc) EditPage(name string, oldContent string, newNodes []*logseq.OutlineNode) error {
+func (s *pageSvc) EditPage(name string, oldContent string, newContent string) error {
 	blocks, exists, err := s.getPageBlocks(name)
 	if err != nil {
 		return err
@@ -132,54 +129,64 @@ func (s *pageSvc) EditPage(name string, oldContent string, newNodes []*logseq.Ou
 		return fmt.Errorf("page not found: %s", name)
 	}
 
-	var matches []logseq.Block
-	var dfs func(bs []logseq.Block)
-	dfs = func(bs []logseq.Block) {
-		for _, b := range bs {
-			if logseq.CleanContent(b.Content) == oldContent {
-				matches = append(matches, b)
-			}
-			dfs(b.Children)
-		}
-	}
-	dfs(blocks)
-
-	if len(matches) == 0 {
-		return fmt.Errorf("block not found: %q", oldContent)
-	}
-	if len(matches) > 1 {
-		return fmt.Errorf("ambiguous match: %d blocks match %q", len(matches), oldContent)
-	}
-
-	matched := matches[0]
-
-	newRootContent := ""
-	if len(newNodes) > 0 {
-		newRootContent = newNodes[0].Content
-	}
-	if err := s.blockSvc.UpdateBlock(matched.UUID, newRootContent); err != nil {
+	plan, err := computeEditPlan(blocks, oldContent, newContent)
+	if err != nil {
 		return err
 	}
 
-	for _, child := range matched.Children {
-		if _, err := s.client.DoAPI("logseq.Editor.removeBlock", []any{child.UUID}); err != nil {
-			return err
+	// Execute removals
+	for _, uuid := range plan.RemoveUUIDs {
+		if err := s.blockSvc.RemoveBlock(uuid); err != nil {
+			return fmt.Errorf("failed to remove block %s: %w", uuid, err)
 		}
 	}
 
-	var newChildren []*logseq.OutlineNode
-	if len(newNodes) > 0 {
-		newChildren = newNodes[0].Children
-	}
-	if len(newChildren) > 0 {
-		if err := s.blockSvc.InsertTree(matched.UUID, newChildren); err != nil {
-			return err
-		}
+	if len(plan.NewNodes) == 0 {
+		return nil
 	}
 
-	prevUUID := matched.UUID
-	for _, node := range newNodes[1:] {
-		uuid, err := s.blockSvc.InsertBlock(prevUUID, node.Content, "after")
+	// Execute insertions
+	if plan.AnchorUUID == "" {
+		// Affected blocks were at the very beginning — re-fetch and insert before first remaining
+		newBlocks, _, err := s.getPageBlocks(name)
+		if err != nil {
+			return err
+		}
+		if len(newBlocks) == 0 {
+			return s.WritePage(name, plan.NewNodes)
+		}
+		firstUUID := newBlocks[0].UUID
+		prevUUID, err := s.blockSvc.InsertBlock(firstUUID, plan.NewNodes[0].Content, "before")
+		if err != nil {
+			return err
+		}
+		if len(plan.NewNodes[0].Children) > 0 {
+			if err := s.blockSvc.InsertTree(prevUUID, plan.NewNodes[0].Children); err != nil {
+				return err
+			}
+		}
+		for _, node := range plan.NewNodes[1:] {
+			uuid, err := s.blockSvc.InsertBlock(prevUUID, node.Content, "after")
+			if err != nil {
+				return err
+			}
+			if len(node.Children) > 0 {
+				if err := s.blockSvc.InsertTree(uuid, node.Children); err != nil {
+					return err
+				}
+			}
+			prevUUID = uuid
+		}
+		return nil
+	}
+
+	prevUUID := plan.AnchorUUID
+	pos := plan.AnchorPosition
+	for i, node := range plan.NewNodes {
+		if i > 0 {
+			pos = "after"
+		}
+		uuid, err := s.blockSvc.InsertBlock(prevUUID, node.Content, pos)
 		if err != nil {
 			return err
 		}

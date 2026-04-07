@@ -10,6 +10,7 @@ type BlockSvc interface {
 	GetBlock(uuid string) (*logseq.Block, error)
 	InsertBlock(targetUUID, content, position string) (string, error)
 	UpdateBlock(uuid, content string) error
+	RemoveBlock(uuid string) error
 	InsertTree(parentUUID string, nodes []*logseq.OutlineNode) error
 }
 
@@ -56,6 +57,11 @@ func (s *blockSvc) InsertBlock(targetUUID, content, position string) (string, er
 
 func (s *blockSvc) UpdateBlock(uuid, content string) error {
 	_, err := s.client.DoAPI("logseq.Editor.updateBlock", []any{uuid, content})
+	return err
+}
+
+func (s *blockSvc) RemoveBlock(uuid string) error {
+	_, err := s.client.DoAPI("logseq.Editor.removeBlock", []any{uuid})
 	return err
 }
 
