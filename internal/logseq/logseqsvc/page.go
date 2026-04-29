@@ -268,7 +268,7 @@ func (s *pageSvc) ListJournalPages(startDate, endDate string, limit, offset int)
 		conditions = append(conditions, fmt.Sprintf("[(>= ?jday %s)]", startDate))
 	}
 	if endDate != "" {
-		conditions = append(conditions, fmt.Sprintf("[(< ?jday %s)]", endDate))
+		conditions = append(conditions, fmt.Sprintf("[(<= ?jday %s)]", endDate))
 	}
 	dq := "[:find ?name ?jday :where " + strings.Join(conditions, " ") + "]"
 
